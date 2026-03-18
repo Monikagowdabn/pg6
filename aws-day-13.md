@@ -1,4 +1,218 @@
 Task 1 — Deploy VPC + Public EC2 + Private RDS MySQL via CloudFormation
 Objective: Provision a production-style VPC with public EC2 and a fully private RDS MySQL instance. EC2 can reach RDS over port 3306; RDS is not internet-accessible. MySQL client installed on EC2 via UserData for direct DB connectivity testing.
 
-CFT: stack2-vpc-ec2-rds-mysql.json
+CFT: 
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "VPC with EC2 (public) and RDS MySQL (private)",
+    "Parameters": {
+        "LatestAmazonLinuxAMI": {
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+            "Default": "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+        },
+        "Password": {
+            "Type": "String",
+            "NoEcho": true,
+            "Description": "Password for ec2-user",
+            "MinLength": 8
+        },
+        "DBPassword": {
+            "Type": "String",
+            "NoEcho": true,
+            "Description": "MySQL root password",
+            "MinLength": 8
+        }
+    },
+    "Resources": {
+        "ProdVPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "192.168.0.0/16",
+                "EnableDnsSupport": true,
+                "EnableDnsHostnames": true,
+                "Tags": [{ "Key": "Name", "Value": "ProdVPC" }]
+            }
+        },
+        "ProdInternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [{ "Key": "Name", "Value": "ProdIGW" }]
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": { "Ref": "ProdVPC" },
+                "InternetGatewayId": { "Ref": "ProdInternetGateway" }
+            }
+        },
+        "PublicSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "ProdVPC" },
+                "CidrBlock": "192.168.1.0/24",
+                "MapPublicIpOnLaunch": true,
+                "AvailabilityZone": { "Fn::Select": [0, { "Fn::GetAZs": "" }] },
+                "Tags": [{ "Key": "Name", "Value": "ProdPublicSubnet1" }]
+            }
+        },
+        "PublicSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "ProdVPC" },
+                "CidrBlock": "192.168.2.0/24",
+                "MapPublicIpOnLaunch": true,
+                "AvailabilityZone": { "Fn::Select": [1, { "Fn::GetAZs": "" }] },
+                "Tags": [{ "Key": "Name", "Value": "ProdPublicSubnet2" }]
+            }
+        },
+        "PrivateSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "ProdVPC" },
+                "CidrBlock": "192.168.3.0/24",
+                "MapPublicIpOnLaunch": false,
+                "AvailabilityZone": { "Fn::Select": [0, { "Fn::GetAZs": "" }] },
+                "Tags": [{ "Key": "Name", "Value": "ProdPrivateSubnet1" }]
+            }
+        },
+        "PrivateSubnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "ProdVPC" },
+                "CidrBlock": "192.168.4.0/24",
+                "MapPublicIpOnLaunch": false,
+                "AvailabilityZone": { "Fn::Select": [1, { "Fn::GetAZs": "" }] },
+                "Tags": [{ "Key": "Name", "Value": "ProdPrivateSubnet2" }]
+            }
+        },
+        "PublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "ProdVPC" },
+                "Tags": [{ "Key": "Name", "Value": "ProdPublicRT" }]
+            }
+        },
+        "DefaultRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "RouteTableId": { "Ref": "PublicRouteTable" },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": { "Ref": "ProdInternetGateway" }
+            }
+        },
+        "SubnetRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "PublicSubnet1" },
+                "RouteTableId": { "Ref": "PublicRouteTable" }
+            }
+        },
+        "SubnetRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": { "Ref": "PublicSubnet2" },
+                "RouteTableId": { "Ref": "PublicRouteTable" }
+            }
+        },
+        "EC2SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Allow SSH and HTTP",
+                "VpcId": { "Ref": "ProdVPC" },
+                "SecurityGroupIngress": [
+                    { "IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "CidrIp": "0.0.0.0/0" },
+                    { "IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "CidrIp": "0.0.0.0/0" }
+                ],
+                "Tags": [{ "Key": "Name", "Value": "EC2SG" }]
+            }
+        },
+        "RDSSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Allow MySQL only from EC2 security group",
+                "VpcId": { "Ref": "ProdVPC" },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 3306,
+                        "ToPort": 3306,
+                        "SourceSecurityGroupId": { "Ref": "EC2SecurityGroup" }
+                    }
+                ],
+                "Tags": [{ "Key": "Name", "Value": "RDSSG" }]
+            }
+        },
+        "RDSSubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupDescription": "Private subnets for RDS",
+                "SubnetIds": [
+                    { "Ref": "PrivateSubnet1" },
+                    { "Ref": "PrivateSubnet2" }
+                ]
+            }
+        },
+        "MyRDSInstance": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "DBInstanceIdentifier": "prodmysqldb",
+                "DBInstanceClass": "db.t3.micro",
+                "Engine": "mysql",
+                "EngineVersion": "8.0",
+                "MasterUsername": "admin",
+                "MasterUserPassword": { "Ref": "DBPassword" },
+                "AllocatedStorage": 20,
+                "StorageType": "gp2",
+                "PubliclyAccessible": false,
+                "MultiAZ": false,
+                "DBSubnetGroupName": { "Ref": "RDSSubnetGroup" },
+                "VPCSecurityGroups": [{ "Ref": "RDSSecurityGroup" }],
+                "DeletionProtection": false
+            }
+        },
+        "MyEC2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": "t3.micro",
+                "ImageId": { "Ref": "LatestAmazonLinuxAMI" },
+                "SubnetId": { "Ref": "PublicSubnet1" },
+                "SecurityGroupIds": [{ "Ref": "EC2SecurityGroup" }],
+                "KeyName": "lab",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "#!/bin/bash\ndnf update -y\ndnf install -y nginx\nsystemctl start nginx\nsystemctl enable nginx\necho \"ec2-user:${Password}\" | chpasswd\nsed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config\nsed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/g' /etc/ssh/sshd_config\nsed -i 's/PermitRootLogin no/PermitRootLogin yes/g' /etc/ssh/sshd_config\nsystemctl restart sshd\ndnf install -y mariadb105\n"
+                    }
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "InstancePublicIP": {
+            "Description": "EC2 Public IP",
+            "Value": { "Fn::GetAtt": ["MyEC2Instance", "PublicIp"] }
+        },
+        "SSHCommand": {
+            "Description": "SSH command to connect to EC2",
+            "Value": { "Fn::Sub": "ssh ec2-user@${MyEC2Instance.PublicIp}" }
+        },
+        "RDSEndpoint": {
+            "Description": "RDS MySQL endpoint",
+            "Value": { "Fn::GetAtt": ["MyRDSInstance", "Endpoint.Address"] }
+        },
+        "MySQLConnectCommand": {
+            "Description": "Run this on EC2 to connect to RDS",
+            "Value": { "Fn::Sub": "mysql -h ${MyRDSInstance.Endpoint.Address} -u admin -p" }
+        },
+        "VPCId": {
+            "Value": { "Ref": "ProdVPC" }
+        }
+    }
+}
+
+<img width="1912" height="968" alt="task1111" src="https://github.com/user-attachments/assets/8141e18a-0e64-43cb-8e6a-30cad76b328b" />
+<img width="846" height="446" alt="task111" src="https://github.com/user-
+  attachments/assets/bd9bcf3d-14c1-4694-823b-8a8e54289b6f" />
+<img width="1888" height="485" alt="task11" src="https://github.com/user-attachments/assets/de16ab74-f62a-4be8-8275-2610b0e881e2" />
+<img width="1502" height="411" alt="task1" src="https://github.com/user-attachments/assets/ff8968f7-b02c-4725-b662-ab5f7c1789a1" />
