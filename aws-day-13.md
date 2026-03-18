@@ -9,6 +9,8 @@ Objective: Provision a production-style VPC with public EC2 and a fully private 
 
 
 Task2:
+Build a secure, dynamic, and automated EC2 deployment system using CloudFormation with OS-based provisioning and web server setup.
+objective:The objective of this task is to design and deploy a secure, flexible, and automated cloud infrastructure using AWS CloudFormation that enables users to dynamically launch either a Linux server, a Windows server, or both within a custom VPC, while automatically installing and configuring web servers (Apache for Linux and IIS for Windows), enforcing security by restricting SSH and RDP access to a specific IP address, allowing public access to hosted web applications over HTTP, and ensuring the entire setup follows Infrastructure as Code principles for consistency, scalability, and ease of deployment.
 
 <img width="1897" height="1009" alt="task2222" src="https://github.com/user-attachments/assets/651dcc2d-64b6-4c77-8d2c-b162e1aa9262" />
 <img width="1910" height="874" alt="task222" src="https://github.com/user-attachments/assets/683d9d2f-4826-49db-8584-27616ef3a889" />
