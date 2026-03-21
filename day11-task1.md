@@ -11,7 +11,7 @@ Task-4 Database integraton with application
                   . sudo yum install docker
                   . sudo service docker start
                   * Create a Docker image
-                  . touch Dockerfile
+                  . touch Dockerfile  
                   . nano Dockerfile
 ***Dockerfile :**  
 FROM public.ecr.aws/amazonlinux/amazonlinux:latest
