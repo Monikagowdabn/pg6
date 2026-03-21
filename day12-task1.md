@@ -1,11 +1,11 @@
 # TASK 1: Deploy an EC2 Instance using CloudFormation
 
-## 📌 Description
+##  Description
 This task demonstrates how to deploy an EC2 instance using a CloudFormation Template (CFT). The template provisions an EC2 instance along with a security group that allows SSH and HTTP access.
 
 ---
 
-## 🧾 CloudFormation Template
+##  CloudFormation Template
 
 ```yaml
 AWSTemplateFormatVersion: "2010-09-09"
