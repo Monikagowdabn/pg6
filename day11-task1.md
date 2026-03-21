@@ -13,7 +13,7 @@ Task-4 Database integraton with application
                   * Create a Docker image
                   . touch Dockerfile
                   . nano Dockerfile
-***Dockerfile :**
+***Dockerfile :**  
 FROM public.ecr.aws/amazonlinux/amazonlinux:latest
 RUN yum update -y && \
 yum install -y httpd
