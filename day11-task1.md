@@ -13,30 +13,22 @@ Task-4 Database integraton with application
                   * Create a Docker image
                   . touch Dockerfile
                   . nano Dockerfile
-            *Dockerfile :
-                  FROM public.ecr.aws/amazonlinux/amazonlinux:latest
-
-# Update installed packages and install Apache
+***Dockerfile :**
+FROM public.ecr.aws/amazonlinux/amazonlinux:latest
 RUN yum update -y && \
- yum install -y httpd
-
-# Write hello world message
+yum install -y httpd
 RUN echo 'Hello World!' > /var/www/html/index.html
-
-# Configure Apache
 RUN echo 'mkdir -p /var/run/httpd' >> /root/run_apache.sh && \
  echo 'mkdir -p /var/lock/httpd' >> /root/run_apache.sh && \
  echo '/usr/sbin/httpd -D FOREGROUND' >> /root/run_apache.sh && \
  chmod 755 /root/run_apache.sh
-
 EXPOSE 80
-
 CMD /root/run_apache.sh
                . docker build -t hello-world .
                . docker images --filter reference=hello-world
                . docker run -t -i -p 80:80 hello-world
 
-Push image to Amazon Elastic Container Registry
+**Push image to Amazon Elastic Container Registry**
           * aws ecr create-repository --repository-name hello-repository --region us-east-1
 <img width="740" height="350" alt="Screenshot 2026-03-17 171911" src="https://github.com/user-attachments/assets/0b565f9c-deec-4626-a670-685dc27e4cc2" />
           * docker tag hello-world 863942760608.dkr.ecr.us-east-1.amazonaws.com/hello-repository
