@@ -179,17 +179,3 @@ By completing this lab, participants gain practical experience in:
 - Working with cloud infrastructure
 - Understanding distributed systems
 
----
-
-## 🚀 Next Steps
-
-- Explore Azure Virtual Machines
-- Learn Azure Networking
-- Practice ARM Templates
-- Prepare for AZ-900 Certification
-
----
-
-## 🎉 Completion
-
-You have successfully completed the **Contoso Multi-Region Deployment Lab**!
