@@ -2,17 +2,23 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "storageAccountName": {
-      "value": "contosostorage"
+    "vmName": {
+      "value": "jumpvm-contoso"
+    },
+    "adminUsername": {
+      "value": "contosoadmin"
+    },
+    "adminPassword": {
+      "value": "Contoso@Training2024!"
+    },
+    "vmSize": {
+      "value": "Standard_D2s_v3"
     },
     "location": {
       "value": "eastus"
     },
-    "storageAccountType": {
-      "value": "Standard_LRS"
-    },
-    "storageAccountKind": {
-      "value": "StorageV2"
+    "storageAccountName": {
+      "value": "contosostorage"
     }
   }
 }
