@@ -4,32 +4,52 @@
   "parameters": {
     "storageAccountName": {
       "type": "string",
+      "defaultValue": "contosostorage",
       "metadata": {
-        "description": "Name of the storage account"
+        "description": "Name of the storage account. A unique string will be appended automatically."
       }
     },
     "location": {
       "type": "string",
+      "defaultValue": "[resourceGroup().location]",
       "metadata": {
-        "description": "Azure region for deployment"
+        "description": "Azure region for deployment. Defaults to resource group location."
       }
     },
     "storageAccountType": {
       "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_GRS",
+        "Standard_ZRS"
+      ],
       "metadata": {
-        "description": "Storage account replication type"
+        "description": "Storage account replication type. Standard_LRS is cheapest and works on Free Trial."
       }
     },
     "storageKind": {
       "type": "string",
+      "defaultValue": "StorageV2",
+      "allowedValues": [
+        "StorageV2",
+        "Storage",
+        "BlobStorage"
+      ],
       "metadata": {
-        "description": "Kind of storage account"
+        "description": "Kind of storage account. StorageV2 is recommended."
       }
     },
     "tlsVersion": {
       "type": "string",
+      "defaultValue": "TLS1_2",
+      "allowedValues": [
+        "TLS1_0",
+        "TLS1_1",
+        "TLS1_2"
+      ],
       "metadata": {
-        "description": "Minimum TLS version"
+        "description": "Minimum TLS version. TLS1_2 is recommended for security."
       }
     }
   },
@@ -47,10 +67,15 @@
       },
       "kind": "[parameters('storageKind')]",
       "properties": {
-        "supportsHttpsTrafficOnly": true,
         "minimumTlsVersion": "[parameters('tlsVersion')]",
         "allowBlobPublicAccess": false,
-        "accessTier": "Hot"
+        "supportsHttpsTrafficOnly": true
+      },
+      "tags": {
+        "project": "Contoso Global Solutions",
+        "environment": "Training",
+        "managedBy": "CloudLabs",
+        "resourceGroup": "RG-03"
       }
     }
   ],
@@ -63,7 +88,7 @@
       "type": "string",
       "value": "[resourceId('Microsoft.Storage/storageAccounts', variables('storageName'))]"
     },
-    "primaryEndpoint": {
+    "primaryBlobEndpoint": {
       "type": "string",
       "value": "[reference(variables('storageName')).primaryEndpoints.blob]"
     }
