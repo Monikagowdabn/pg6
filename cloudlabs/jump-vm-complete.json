@@ -1,0 +1,394 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "vmName": {
+      "type": "string",
+      "defaultValue": "jumpvm-contoso",
+      "metadata": {
+        "description": "Name of the Jump VM. Must match exactly what you enter in CloudLabs VM Configuration tab."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "defaultValue": "contosoadmin",
+      "metadata": {
+        "description": "Administrator username for the Jump VM."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "defaultValue": "Contoso@Training2024!",
+      "metadata": {
+        "description": "Administrator password. Must be 12+ characters with uppercase, lowercase, number and special character."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_B1s",
+      "allowedValues": [
+        "Standard_B1s",
+        "Standard_B1ms",
+        "Standard_B2s",
+        "Standard_B2ms",
+        "Standard_B4ms",
+        "Standard_B8ms",
+        "Standard_DS1_v2",
+        "Standard_DS2_v2",
+        "Standard_DS3_v2",
+        "Standard_DS4_v2",
+        "Standard_D2s_v3",
+        "Standard_D4s_v3",
+        "Standard_D8s_v3",
+        "Standard_D2s_v4",
+        "Standard_D4s_v4",
+        "Standard_D2s_v5",
+        "Standard_D4s_v5",
+        "Standard_F2s_v2",
+        "Standard_F4s_v2",
+        "Standard_F8s_v2",
+        "Standard_E2s_v3",
+        "Standard_E4s_v3"
+      ],
+      "metadata": {
+        "description": "VM size. Default is Standard_B1s (1 vCPU, 1GB) \u2014 smallest, works on Free Trial. B-series = burstable, no quota needed. D/DS/F/E series = higher performance but may need quota approval on Free Trial."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "eastus",
+      "allowedValues": [
+        "eastus",
+        "westus",
+        "westus2",
+        "westeurope",
+        "northeurope",
+        "southeastasia",
+        "centralindia"
+      ],
+      "metadata": {
+        "description": "Azure region. Set to East US as requested. If quota error occurs, switch to westus or westus2."
+      }
+    },
+    "dnsLabelPrefix": {
+      "type": "string",
+      "defaultValue": "[toLower(concat('jumpvm-contoso-', uniqueString(resourceGroup().id)))]",
+      "metadata": {
+        "description": "Unique DNS label for the Public IP. Auto-generated using the resource group ID to ensure uniqueness per participant. CloudLabs reads this as the Server DNS Name."
+      }
+    },
+    "windowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2022-datacenter-azure-edition",
+      "allowedValues": [
+        "2022-datacenter-azure-edition",
+        "2019-datacenter-gensecond",
+        "2016-datacenter-gensecond"
+      ],
+      "metadata": {
+        "description": "Windows Server OS version for the Jump VM."
+      }
+    },
+    "osDiskSizeGB": {
+      "type": "int",
+      "defaultValue": 127,
+      "minValue": 64,
+      "maxValue": 256,
+      "metadata": {
+        "description": "OS disk size in GB. 127 GB is default and works on Free Trial."
+      }
+    },
+    "vnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/16",
+      "metadata": {
+        "description": "Address prefix for the Virtual Network."
+      }
+    },
+    "subnetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.0.0/24",
+      "metadata": {
+        "description": "Address prefix for the subnet inside the VNet."
+      }
+    },
+    "enableBootDiagnostics": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Enable boot diagnostics for troubleshooting VM startup issues."
+      }
+    }
+  },
+  "variables": {
+    "nicName": "[concat(parameters('vmName'), '-nic')]",
+    "publicIPName": "[concat(parameters('vmName'), '-pip')]",
+    "vnetName": "[concat(parameters('vmName'), '-vnet')]",
+    "subnetName": "default",
+    "nsgName": "[concat(parameters('vmName'), '-nsg')]",
+    "osDiskName": "[concat(parameters('vmName'), '-osdisk')]",
+    "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetName'), variables('subnetName'))]",
+    "publicIPRef": "[resourceId('Microsoft.Network/publicIPAddresses', variables('publicIPName'))]",
+    "nsgRef": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgName'))]",
+    "nicRef": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+  },
+  "resources": [
+    {
+      "comments": "Public IP Address \u2014 gives the Jump VM a static IP and DNS name for CloudLabs to connect via browser RDP",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2023-04-01",
+      "name": "[variables('publicIPName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Static",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsLabelPrefix')]"
+        }
+      },
+      "tags": {
+        "project": "Contoso Global Solutions",
+        "environment": "Training",
+        "managedBy": "CloudLabs",
+        "role": "JumpVM-PublicIP"
+      }
+    },
+    {
+      "comments": "Network Security Group \u2014 opens ports 3389 (RDP), 80 (HTTP), 443 (HTTPS) required for CloudLabs browser-based VM access",
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-04-01",
+      "name": "[variables('nsgName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow-RDP",
+            "properties": {
+              "priority": 100,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "3389",
+              "description": "Allow RDP port 3389 \u2014 required for CloudLabs in-browser RDP (Apache Guacamole)"
+            }
+          },
+          {
+            "name": "Allow-HTTP",
+            "properties": {
+              "priority": 110,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "80",
+              "description": "Allow HTTP port 80 \u2014 required for CloudLabs Enable VM Access Over HTTP feature"
+            }
+          },
+          {
+            "name": "Allow-HTTPS",
+            "properties": {
+              "priority": 120,
+              "protocol": "Tcp",
+              "access": "Allow",
+              "direction": "Inbound",
+              "sourceAddressPrefix": "*",
+              "sourcePortRange": "*",
+              "destinationAddressPrefix": "*",
+              "destinationPortRange": "443",
+              "description": "Allow HTTPS port 443 \u2014 required for secure CloudLabs web VM access"
+            }
+          }
+        ]
+      },
+      "tags": {
+        "project": "Contoso Global Solutions",
+        "environment": "Training",
+        "managedBy": "CloudLabs",
+        "role": "JumpVM-NSG"
+      }
+    },
+    {
+      "comments": "Virtual Network \u2014 isolated network for the Jump VM",
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-04-01",
+      "name": "[variables('vnetName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[variables('nsgRef')]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('vnetAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('subnetAddressPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[variables('nsgRef')]"
+              }
+            }
+          }
+        ]
+      },
+      "tags": {
+        "project": "Contoso Global Solutions",
+        "environment": "Training",
+        "managedBy": "CloudLabs",
+        "role": "JumpVM-VNet"
+      }
+    },
+    {
+      "comments": "Network Interface \u2014 connects the Jump VM to the VNet and Public IP",
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2023-04-01",
+      "name": "[variables('nicName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[variables('publicIPRef')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[variables('publicIPRef')]"
+              },
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ]
+      },
+      "tags": {
+        "project": "Contoso Global Solutions",
+        "environment": "Training",
+        "managedBy": "CloudLabs",
+        "role": "JumpVM-NIC"
+      }
+    },
+    {
+      "comments": "Jump VM \u2014 Windows Server 2022 VM that participants connect to via browser RDP in CloudLabs",
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('vmName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[variables('nicRef')]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]",
+          "windowsConfiguration": {
+            "enableAutomaticUpdates": true,
+            "provisionVMAgent": true,
+            "patchSettings": {
+              "patchMode": "AutomaticByOS"
+            }
+          }
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "[parameters('windowsOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[variables('osDiskName')]",
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
+            },
+            "diskSizeGB": "[parameters('osDiskSizeGB')]",
+            "deleteOption": "Delete"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[variables('nicRef')]",
+              "properties": {
+                "deleteOption": "Delete"
+              }
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": "[parameters('enableBootDiagnostics')]"
+          }
+        }
+      },
+      "tags": {
+        "project": "Contoso Global Solutions",
+        "environment": "Training",
+        "managedBy": "CloudLabs",
+        "role": "JumpVM"
+      }
+    }
+  ],
+  "outputs": {
+    "vmName": {
+      "type": "string",
+      "value": "[parameters('vmName')]",
+      "metadata": {
+        "description": "Enter this exact value in CloudLabs Template > VM Configuration > Name field"
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "value": "[parameters('adminUsername')]",
+      "metadata": {
+        "description": "Enter this in CloudLabs Template > VM Configuration > Server Username field"
+      }
+    },
+    "vmPublicDnsName": {
+      "type": "string",
+      "value": "[reference(variables('publicIPRef')).dnsSettings.fqdn]",
+      "metadata": {
+        "description": "Enter this in CloudLabs Template > VM Configuration > Server DNS Name field"
+      }
+    },
+    "vmPublicIPAddress": {
+      "type": "string",
+      "value": "[reference(variables('publicIPRef')).ipAddress]",
+      "metadata": {
+        "description": "Public IP address of the Jump VM (for reference only)"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "value": "[parameters('vmSize')]",
+      "metadata": {
+        "description": "VM size used for this deployment"
+      }
+    },
+    "deploymentRegion": {
+      "type": "string",
+      "value": "[parameters('location')]",
+      "metadata": {
+        "description": "Azure region where resources were deployed"
+      }
+    }
+  }
+}
