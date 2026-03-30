@@ -4,7 +4,7 @@
   "parameters": {
     "storageAccountName": {
       "type": "string",
-      "defaultValue": "contosostorage",
+      "defaultValue": "csto",
       "metadata": {
         "description": "Name of the storage account. A unique string will be appended automatically."
       }
@@ -54,7 +54,7 @@
     }
   },
   "variables": {
-    "storageName": "[toLower(concat(parameters('storageAccountName'), uniqueString(resourceGroup().id)))]"
+    "storageName": "[toLower(concat('csto', uniqueString(resourceGroup().id)))]"
   },
   "resources": [
     {
