@@ -22,6 +22,7 @@ Understand how Azure supports multi-region deployments for high availability and
    | Redundancy | GRS (Geo-Redundant Storage) |
 
 4. Click **Review + Create** → **Create**
+<img width="1310" height="908" alt="Screenshot 2026-03-31 132319" src="https://github.com/user-attachments/assets/37a344ff-6e5b-4833-bae9-c77d6a435cad" />
 
 ### Task 2: Compare Both Storage Accounts
 1. Go to RG-02 → you now have 2 storage accounts
@@ -32,6 +33,8 @@ Understand how Azure supports multi-region deployments for high availability and
    | Region | East US | West US |
    | Replication | LRS | GRS |
    | Endpoint | *.eastus.* | *.westus.* |
+<img width="1240" height="905" alt="Screenshot 2026-03-31 132535" src="https://github.com/user-attachments/assets/dc7d917b-cdf9-4792-babb-f16e26fce400" />
+<img width="1244" height="839" alt="Screenshot 2026-03-31 132557" src="https://github.com/user-attachments/assets/2dbcfde0-bf98-4789-8746-d9b0df9551e6" />
 
 ### Task 3: Understand Azure Paired Regions
 1. In Azure Portal search bar, search for **"Azure regions"**
@@ -41,6 +44,7 @@ Understand how Azure supports multi-region deployments for high availability and
    - Disaster recovery
    - Data residency compliance
    - Sequential updates
+   - 
 
 ### Task 4: Understand GRS Replication
 1. Open the West US storage account
