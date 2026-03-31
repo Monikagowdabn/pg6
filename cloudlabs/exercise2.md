@@ -51,9 +51,9 @@ Explore the storage account that was automatically deployed in RG-03 via ARM tem
 1. Click **Access Keys** in the left menu
 2. Click **Show** to reveal the keys
 3. Note the **Connection String** — this is used by applications to connect to storage
-   <img width="1903" height="916" alt="Screenshot 2026-03-31 124334" src="https://github.com/user-attachments/assets/4163bb44-7376-428e-9767-ad11c8b3938a" />
-
    
+   <img width="1901" height="902" alt="Screenshot 2026-03-31 124656" src="https://github.com/user-attachments/assets/63b48bf1-9ac0-4715-868d-280beba805bf" />
+
 
 ## Expected Result
 ✅ Storage account properties are visible  
