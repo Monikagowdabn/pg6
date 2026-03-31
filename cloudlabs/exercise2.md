@@ -42,7 +42,7 @@ Explore the storage account that was automatically deployed in RG-03 via ARM tem
 4. Click **Create**
 5. Click on the new container → click **Upload** → upload any small file
    <img width="1905" height="900" alt="Screenshot 2026-03-31 123954" src="https://github.com/user-attachments/assets/6bd6d024-6f73-4083-82e1-acb60408525c" />
-<img width="1504" height="224" alt="Screenshot 2026-03-31 124051" src="https://github.com/user-attachments/assets/5424b753-4e83-4b89-a935-4607ea5cacc0" />
+
 <img width="1902" height="875" alt="Screenshot 2026-03-31 124130" src="https://github.com/user-attachments/assets/7cfe460c-8614-4b0a-8298-838579c5cd49" />
 <img width="1909" height="852" alt="Screenshot 2026-03-31 124158" src="https://github.com/user-attachments/assets/6feae970-850f-44fe-b971-47d56e1d274e" />
 
