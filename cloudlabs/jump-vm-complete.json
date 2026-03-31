@@ -25,38 +25,30 @@
     },
     "vmSize": {
       "type": "string",
-      "defaultValue": "Standard_B1s",
+      "defaultValue": "Standard_D2s_v3",
       "allowedValues": [
-        "Standard_B1s",
-        "Standard_B1ms",
         "Standard_B2s",
         "Standard_B2ms",
         "Standard_B4ms",
-        "Standard_B8ms",
-        "Standard_DS1_v2",
-        "Standard_DS2_v2",
-        "Standard_DS3_v2",
-        "Standard_DS4_v2",
         "Standard_D2s_v3",
         "Standard_D4s_v3",
-        "Standard_D8s_v3",
         "Standard_D2s_v4",
         "Standard_D4s_v4",
         "Standard_D2s_v5",
         "Standard_D4s_v5",
+        "Standard_DS1_v2",
+        "Standard_DS2_v2",
+        "Standard_DS3_v2",
         "Standard_F2s_v2",
-        "Standard_F4s_v2",
-        "Standard_F8s_v2",
-        "Standard_E2s_v3",
-        "Standard_E4s_v3"
+        "Standard_F4s_v2"
       ],
       "metadata": {
-        "description": "VM size. Default is Standard_B1s (1 vCPU, 1GB) \u2014 smallest, works on Free Trial. B-series = burstable, no quota needed. D/DS/F/E series = higher performance but may need quota approval on Free Trial."
+        "description": "VM size. All are x64 compatible. Standard_D2s_v3 is recommended for Windows Server 2025."
       }
     },
     "location": {
       "type": "string",
-      "defaultValue": "eastus",
+      "defaultValue": "westus",
       "allowedValues": [
         "eastus",
         "westus",
@@ -75,18 +67,6 @@
       "defaultValue": "[toLower(concat('jumpvm-contoso-', uniqueString(resourceGroup().id)))]",
       "metadata": {
         "description": "Unique DNS label for the Public IP. Auto-generated using the resource group ID to ensure uniqueness per participant. CloudLabs reads this as the Server DNS Name."
-      }
-    },
-    "windowsOSVersion": {
-      "type": "string",
-      "defaultValue": "2022-datacenter-azure-edition",
-      "allowedValues": [
-        "2022-datacenter-azure-edition",
-        "2019-datacenter-gensecond",
-        "2016-datacenter-gensecond"
-      ],
-      "metadata": {
-        "description": "Windows Server OS version for the Jump VM."
       }
     },
     "osDiskSizeGB": {
@@ -134,7 +114,6 @@
   },
   "resources": [
     {
-      "comments": "Public IP Address \u2014 gives the Jump VM a static IP and DNS name for CloudLabs to connect via browser RDP",
       "type": "Microsoft.Network/publicIPAddresses",
       "apiVersion": "2023-04-01",
       "name": "[variables('publicIPName')]",
@@ -156,7 +135,6 @@
       }
     },
     {
-      "comments": "Network Security Group \u2014 opens ports 3389 (RDP), 80 (HTTP), 443 (HTTPS) required for CloudLabs browser-based VM access",
       "type": "Microsoft.Network/networkSecurityGroups",
       "apiVersion": "2023-04-01",
       "name": "[variables('nsgName')]",
@@ -215,7 +193,6 @@
       }
     },
     {
-      "comments": "Virtual Network \u2014 isolated network for the Jump VM",
       "type": "Microsoft.Network/virtualNetworks",
       "apiVersion": "2023-04-01",
       "name": "[variables('vnetName')]",
@@ -249,7 +226,6 @@
       }
     },
     {
-      "comments": "Network Interface \u2014 connects the Jump VM to the VNet and Public IP",
       "type": "Microsoft.Network/networkInterfaces",
       "apiVersion": "2023-04-01",
       "name": "[variables('nicName')]",
@@ -282,7 +258,6 @@
       }
     },
     {
-      "comments": "Jump VM \u2014 Windows Server 2022 VM that participants connect to via browser RDP in CloudLabs",
       "type": "Microsoft.Compute/virtualMachines",
       "apiVersion": "2023-07-01",
       "name": "[parameters('vmName')]",
@@ -310,7 +285,7 @@
           "imageReference": {
             "publisher": "MicrosoftWindowsServer",
             "offer": "WindowsServer",
-            "sku": "[parameters('windowsOSVersion')]",
+            "sku": "2025-datacenter-g2",
             "version": "latest"
           },
           "osDisk": {
@@ -344,6 +319,24 @@
         "environment": "Training",
         "managedBy": "CloudLabs",
         "role": "JumpVM"
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines/extensions",
+      "apiVersion": "2023-07-01",
+      "name": "[concat(parameters('vmName'), '/CloudLabsRDPAgent')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
+      ],
+      "properties": {
+        "publisher": "Microsoft.Compute",
+        "type": "CustomScriptExtension",
+        "typeHandlerVersion": "1.10",
+        "autoUpgradeMinorVersion": true,
+        "settings": {
+          "commandToExecute": "powershell -ExecutionPolicy Unrestricted -Command \"Set-ItemProperty -Path HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System -Name LocalAccountTokenFilterPolicy -Value 1 -Type DWord; Enable-PSRemoting -Force; Set-NetFirewallRule -Name WINRM-HTTP-In-TCP -RemoteAddress Any; netsh advfirewall firewall add rule name=RDP dir=in action=allow protocol=TCP localport=3389; netsh advfirewall firewall add rule name=HTTP dir=in action=allow protocol=TCP localport=80; netsh advfirewall firewall add rule name=HTTPS dir=in action=allow protocol=TCP localport=443\""
+        }
       }
     }
   ],
