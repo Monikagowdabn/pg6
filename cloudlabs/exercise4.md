@@ -44,7 +44,7 @@ Understand how Azure supports multi-region deployments for high availability and
    - Disaster recovery
    - Data residency compliance
    - Sequential updates
-   - 
+
 
 ### Task 4: Understand GRS Replication
 1. Open the West US storage account
