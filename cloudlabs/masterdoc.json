@@ -3,7 +3,38 @@
   "tableOfContent": {
     "excludeIds": []
   },
-  "activities": [
+  "activities": [[
+  {
+    "Name": "Contoso Global Solutions - Multi-Region Deployment Training",
+    "Language": "English",
+    "Files": [
+      {
+        "RawFilePath": "https://raw.githubusercontent.com/Monikagowdabn/pg6/monika/cloudlabs/getting-started.md",
+        "Order": 1
+      },
+      {
+        "RawFilePath": "https://raw.githubusercontent.com/Monikagowdabn/pg6/monika/cloudlabs/exercise-01.md",
+        "Order": 2
+      },
+      {
+        "RawFilePath": "https://raw.githubusercontent.com/Monikagowdabn/pg6/monika/cloudlabs/exercise-02.md",
+        "Order": 3
+      },
+      {
+        "RawFilePath": "https://raw.githubusercontent.com/Monikagowdabn/pg6/monika/cloudlabs/exercise-03.md",
+        "Order": 4
+      },
+      {
+        "RawFilePath": "https://raw.githubusercontent.com/Monikagowdabn/pg6/monika/cloudlabs/exercise-04.md",
+        "Order": 5
+      },
+      {
+        "RawFilePath": "https://raw.githubusercontent.com/Monikagowdabn/pg6/monika/cloudlabs/summary.md",
+        "Order": 6
+      }
+    ]
+  }
+]
     {
       "activityId": "getting-started",
       "activityName": "Getting Started",
