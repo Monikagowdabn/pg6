@@ -30,10 +30,9 @@ Understand how to explore and manage Virtual Machine configurations in Microsoft
    | Status | Running, Stopped, Deallocated |
    | Public IP | IP address for remote access |
    | DNS Name | Fully qualified domain name |
-   <img width="1159" height="645" alt="Screenshot 2026-03-31 130055" src="https://github.com/user-attachments/assets/c54e88f2-871b-47c6-afd0-42177f8ae0b7" />
-<img width="1008" height="318" alt="Screenshot 2026-03-31 130110" src="https://github.com/user-attachments/assets/65a4a62d-93db-46ab-bc57-917fc07362e4" />
-<img width="1904" height="866" alt="Screenshot 2026-03-31 125934" src="https://github.com/user-attachments/assets/4670d3e5-c8ad-4624-9d12-04d67c31b6e9" />
-
+ <img width="1904" height="866" alt="Screenshot 2026-03-31 125934" src="https://github.com/user-attachments/assets/73429e2f-435b-435a-8722-2a15182af8c1" />
+<img width="1159" height="645" alt="Screenshot 2026-03-31 130055" src="https://github.com/user-attachments/assets/8b068647-d76a-484a-a3af-3c5861519cb9" />
+<img width="1008" height="318" alt="Screenshot 2026-03-31 130110" src="https://github.com/user-attachments/assets/3715b54a-fd56-4bb6-b42f-91bb9437a90d" />
 
 ### Task 3: Explore VM Networking
 1. Click **Networking** in the left menu
@@ -47,11 +46,10 @@ Understand how to explore and manage Virtual Machine configurations in Microsoft
    | 3389 | RDP | Remote Desktop access |
    | 22 | SSH | Linux remote access |
    | 80 | HTTP | Web traffic |
-   | 443 | HTTPS | Secure web traffic |
-   
+   | 443 | HTTPS | Secure web traffic |  
+<img width="1913" height="844" alt="Screenshot 2026-03-31 130454" src="https://github.com/user-attachments/assets/15c42228-c28b-411d-9248-b7b1e57ed36b" />
 <img width="1904" height="907" alt="Screenshot 2026-03-31 130518" src="https://github.com/user-attachments/assets/43f980ad-cac7-427e-b087-256d22bb6762" />
 <img width="1877" height="802" alt="Screenshot 2026-03-31 130556" src="https://github.com/user-attachments/assets/9a70d216-2868-40ca-8533-91706333592c" />
-<img width="1913" height="844" alt="Screenshot 2026-03-31 130454" src="https://github.com/user-attachments/assets/15c42228-c28b-411d-9248-b7b1e57ed36b" />
 
 ### Task 4: Explore VM Disks
 1. Click **Disks** in the left menu
@@ -60,10 +58,10 @@ Understand how to explore and manage Virtual Machine configurations in Microsoft
    - **Data Disks** — additional storage disks
    - **Disk Type** — Standard HDD, Standard SSD, Premium SSD
    - **Encryption** — disk encryption settings
-     <img width="1903" height="588" alt="Screenshot 2026-03-31 130352" src="https://github.com/user-attachments/assets/3bcd846d-8fa1-453f-8d39-21707606c2e7" />
+    
 <img width="1874" height="838" alt="Screenshot 2026-03-31 130332" src="https://github.com/user-attachments/assets/01c94cae-7279-449f-ac70-1ec0980a88fc" />
 
-
+ <img width="1903" height="588" alt="Screenshot 2026-03-31 130352" src="https://github.com/user-attachments/assets/3bcd846d-8fa1-453f-8d39-21707606c2e7" />
 ### Task 5: Explore VM Size Options
 1. Click **Size** in the left menu
 2. Browse the available VM sizes
