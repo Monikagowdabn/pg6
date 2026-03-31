@@ -324,7 +324,7 @@
     {
       "type": "Microsoft.Compute/virtualMachines/extensions",
       "apiVersion": "2023-07-01",
-      "name": "[concat(parameters('vmName'), '/CloudLabsRDPAgent')]",
+      "name": "[concat(parameters('vmName'), '/EnableRDP')]",
       "location": "[parameters('location')]",
       "dependsOn": [
         "[resourceId('Microsoft.Compute/virtualMachines', parameters('vmName'))]"
@@ -335,7 +335,7 @@
         "typeHandlerVersion": "1.10",
         "autoUpgradeMinorVersion": true,
         "settings": {
-          "commandToExecute": "powershell -ExecutionPolicy Unrestricted -Command \"Set-ItemProperty -Path HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System -Name LocalAccountTokenFilterPolicy -Value 1 -Type DWord; Enable-PSRemoting -Force; Set-NetFirewallRule -Name WINRM-HTTP-In-TCP -RemoteAddress Any; netsh advfirewall firewall add rule name=RDP dir=in action=allow protocol=TCP localport=3389; netsh advfirewall firewall add rule name=HTTP dir=in action=allow protocol=TCP localport=80; netsh advfirewall firewall add rule name=HTTPS dir=in action=allow protocol=TCP localport=443\""
+          "commandToExecute": "powershell -ExecutionPolicy Unrestricted -Command \"Set-ItemProperty -Path HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server -Name fDenyTSConnections -Value 0; Enable-NetFirewallRule -DisplayGroup \"Remote Desktop\"; Set-ItemProperty -Path HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System -Name LocalAccountTokenFilterPolicy -Value 1 -Type DWord; netsh advfirewall firewall add rule name=\"RDP-TCP\" dir=in action=allow protocol=TCP localport=3389; netsh advfirewall firewall add rule name=\"HTTP-TCP\" dir=in action=allow protocol=TCP localport=80; netsh advfirewall firewall add rule name=\"HTTPS-TCP\" dir=in action=allow protocol=TCP localport=443; Set-Service -Name TermService -StartupType Automatic; Start-Service -Name TermService\""
         }
       }
     }
