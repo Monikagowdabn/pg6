@@ -12,9 +12,8 @@ Explore the storage account that was automatically deployed in RG-03 via ARM tem
 1. Go to Azure Portal → **Resource Groups** → click on **RG-03**
 2. Click on the **Storage Account** resource
 3. You are now on the Storage Account Overview page
-<img width="1905" height="916" alt="Screenshot 2026-03-31 122633" src="https://github.com/user-attachments/assets/fa3c2d62-7905-43ca-b21e-aa598b376349" />
 
-
+<img width="1909" height="771" alt="Screenshot 2026-03-31 122147" src="https://github.com/user-attachments/assets/a94080ba-5bc7-46ee-8548-a884ccb14c07" />
 
 
 ### Task 2: Explore Storage Account Properties
