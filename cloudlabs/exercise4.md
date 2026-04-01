@@ -56,4 +56,10 @@ Understand how Azure supports multi-region deployments for high availability and
 - **GRS**: Data replicated to a paired region 100s of miles away
 - **Paired Regions**: Azure's built-in regional pairs for disaster recovery
 - **Multi-region**: Deploying resources across regions for high availability
+## Expected Result
+✅ Storage account created in West US  
+✅ Compared East US and West US storage accounts  
+✅ Understood Azure paired regions concept  
+✅ Understood GRS vs LRS replication
+
 
