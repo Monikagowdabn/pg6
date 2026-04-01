@@ -33,11 +33,3 @@ Your lab environment has been pre-configured with the following:
    <img width="592" height="617" alt="Screenshot 2026-03-31 121744" src="https://github.com/user-attachments/assets/cf1bbdb6-4df6-4b86-8d9f-3ed243ea5cfd" />
 
 
-## Connect to Jump VM
-1. Click the **Connect** button on this lab page
-2. Choose **Connect via Browser** for web-based RDP
-3. Enter VM credentials when prompted
-4. The Jump VM will open **directly in the same window** — no tab switching needed!
-5. The Lab Guide remains visible on the right side while you work on the VM
-
-> **Important:** You have only **1 attempt** for this lab. Please do not delete your resource groups.
