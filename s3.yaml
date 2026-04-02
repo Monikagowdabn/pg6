@@ -1,0 +1,599 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Assignment 7 - Complete Amazon S3 Automation
+  Covers: Bucket Creation, Policies, Lifecycle, Replication, and Static Website Hosting
+
+# ============================================================
+# PARAMETERS
+# ============================================================
+Parameters:
+  ProjectName:
+    Type: String
+    Default: assignment7
+    Description: Project name used as prefix for all resource names
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Deployment environment
+
+  ReplicationDestinationRegion:
+    Type: String
+    Default: us-west-2
+    Description: AWS region for the replication destination bucket
+
+# ============================================================
+# RESOURCES
+# ============================================================
+Resources:
+
+  # ----------------------------------------------------------
+  # 1. IAM ROLE FOR S3 REPLICATION
+  # Must be created before buckets that reference it
+  # ----------------------------------------------------------
+  S3ReplicationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-s3-replication-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: s3.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: S3ReplicationPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Allow reading from source bucket
+              - Sid: AllowSourceBucketRead
+                Effect: Allow
+                Action:
+                  - s3:GetReplicationConfiguration
+                  - s3:ListBucket
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-source-bucket"
+
+              # Allow reading source objects
+              - Sid: AllowSourceObjectRead
+                Effect: Allow
+                Action:
+                  - s3:GetObjectVersionForReplication
+                  - s3:GetObjectVersionAcl
+                  - s3:GetObjectVersionTagging
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-source-bucket/*"
+
+              # Allow writing to destination bucket
+              - Sid: AllowDestinationBucketWrite
+                Effect: Allow
+                Action:
+                  - s3:ReplicateObject
+                  - s3:ReplicateDelete
+                  - s3:ReplicateTags
+                  - s3:GetObjectVersionTagging
+                Resource: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-destination-bucket/*"
+
+  # ----------------------------------------------------------
+  # 2. SOURCE BUCKET
+  # Main bucket with versioning and lifecycle rules
+  # ----------------------------------------------------------
+  SourceBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-source-bucket"
+
+      # Block all public access on source bucket (secure default)
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      # Enable versioning (required for replication)
+      VersioningConfiguration:
+        Status: Enabled
+
+      # Lifecycle rules: automatically move objects to cheaper storage
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoTierTransitionRule
+            Status: Enabled
+            Prefix: ""
+            Transitions:
+              # After 30 days ? Standard-IA (Infrequent Access) - cheaper
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+              # After 60 days ? Intelligent-Tiering - auto-optimized cost
+              - TransitionInDays: 60
+                StorageClass: INTELLIGENT_TIERING
+
+      # Replication configuration: copy objects to destination bucket
+      ReplicationConfiguration:
+        Role: !GetAtt S3ReplicationRole.Arn
+        Rules:
+          - Id: FullBucketReplicationRule
+            Status: Enabled
+            Priority: 1
+            Filter:
+              Prefix: ""
+            DeleteMarkerReplication:
+              Status: Disabled
+            Destination:
+              Bucket: !Sub "arn:aws:s3:::${ProjectName}-${Environment}-destination-bucket"
+              StorageClass: STANDARD
+
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: source-with-lifecycle-and-replication
+
+  # ----------------------------------------------------------
+  # 3. DESTINATION BUCKET
+  # Receives replicated objects from source bucket
+  # ----------------------------------------------------------
+  DestinationBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-destination-bucket"
+
+      # Block public access on destination (secure)
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+      # Versioning MUST be enabled on destination for replication to work
+      VersioningConfiguration:
+        Status: Enabled
+
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: replication-destination
+
+  # ----------------------------------------------------------
+  # 4. WEBSITE BUCKET
+  # Hosts the static website (index.html + error.html)
+  # ----------------------------------------------------------
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-website-bucket"
+
+      # Public access MUST be allowed for static website hosting
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+
+      # Enable versioning for website files too
+      VersioningConfiguration:
+        Status: Enabled
+
+      # Configure static website hosting
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+      # Lifecycle for website assets
+      LifecycleConfiguration:
+        Rules:
+          - Id: WebsiteAssetLifecycle
+            Status: Enabled
+            Prefix: ""
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+              - TransitionInDays: 60
+                StorageClass: INTELLIGENT_TIERING
+
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: static-website-hosting
+
+  # ----------------------------------------------------------
+  # 5. BUCKET POLICY: SOURCE BUCKET
+  # Allows the replication role to access source objects
+  # ----------------------------------------------------------
+  SourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow replication role to read objects from source
+          - Sid: AllowReplicationRoleAccess
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt S3ReplicationRole.Arn
+            Action:
+              - s3:GetObjectVersionForReplication
+              - s3:GetObjectVersionAcl
+              - s3:GetObjectVersionTagging
+              - s3:GetReplicationConfiguration
+              - s3:ListBucket
+            Resource:
+              - !GetAtt SourceBucket.Arn
+              - !Sub "${SourceBucket.Arn}/*"
+
+  # ----------------------------------------------------------
+  # 6. BUCKET POLICY: DESTINATION BUCKET
+  # Allows the replication role to write objects to destination
+  # ----------------------------------------------------------
+  DestinationBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DestinationBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow replication role to write replicated objects
+          - Sid: AllowReplicationWrite
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt S3ReplicationRole.Arn
+            Action:
+              - s3:ReplicateObject
+              - s3:ReplicateDelete
+              - s3:ReplicateTags
+              - s3:GetObjectVersionTagging
+            Resource: !Sub "${DestinationBucket.Arn}/*"
+
+  # ----------------------------------------------------------
+  # 7. BUCKET POLICY: WEBSITE BUCKET
+  # Allows public read access so visitors can view the website
+  # ----------------------------------------------------------
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: WebsiteBucket
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Allow EVERYONE to read (GET) website files ? public website
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${WebsiteBucket.Arn}/*"
+
+  # ----------------------------------------------------------
+  # 8. UPLOAD INDEX.HTML TO WEBSITE BUCKET
+  # Uses CloudFormation custom resource via Lambda to upload files
+  # ----------------------------------------------------------
+
+  # Lambda execution role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-lambda-exec-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3WritePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub "${WebsiteBucket.Arn}/*"
+                  - !Sub "${SourceBucket.Arn}/*"
+
+  # Lambda function that uploads HTML files to S3
+  WebsiteFileUploaderFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-website-uploader"
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import json
+
+          def handler(event, context):
+              s3 = boto3.client('s3')
+              bucket = event['ResourceProperties']['BucketName']
+              test_bucket = event['ResourceProperties'].get('SourceBucketName', '')
+
+              # HTML content for index.html
+              index_html = """<!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Assignment 7 - S3 Static Website</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                      min-height: 100vh;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 16px;
+                      padding: 48px;
+                      max-width: 700px;
+                      width: 90%;
+                      text-align: center;
+                      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                  }
+                  .badge {
+                      background: #667eea;
+                      color: white;
+                      padding: 6px 20px;
+                      border-radius: 50px;
+                      font-size: 13px;
+                      font-weight: 600;
+                      display: inline-block;
+                      margin-bottom: 24px;
+                      letter-spacing: 1px;
+                      text-transform: uppercase;
+                  }
+                  h1 { color: #1a1a2e; font-size: 2rem; margin-bottom: 12px; }
+                  p { color: #666; font-size: 1rem; line-height: 1.7; margin-bottom: 32px; }
+                  .features {
+                      display: grid;
+                      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                      gap: 16px;
+                      margin-top: 24px;
+                  }
+                  .feature {
+                      background: #f8f9ff;
+                      border: 1px solid #e8eaff;
+                      border-radius: 12px;
+                      padding: 20px 12px;
+                  }
+                  .feature .icon { font-size: 2rem; margin-bottom: 8px; }
+                  .feature h3 { font-size: 0.85rem; color: #333; font-weight: 600; }
+                  .footer {
+                      margin-top: 36px;
+                      font-size: 0.8rem;
+                      color: #aaa;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="badge">&#x2705; Hosted on Amazon S3</div>
+                  <h1>Assignment 7</h1>
+                  <p>
+                      This static website is fully automated using <strong>AWS CloudFormation</strong>.
+                      The S3 bucket, policies, lifecycle rules, and replication were all
+                      provisioned without any manual steps.
+                  </p>
+                  <div class="features">
+                      <div class="feature">
+                          <div class="icon">&#x1F4E6;</div>
+                          <h3>S3 Buckets</h3>
+                      </div>
+                      <div class="feature">
+                          <div class="icon">&#x1F512;</div>
+                          <h3>Bucket Policies</h3>
+                      </div>
+                      <div class="feature">
+                          <div class="icon">&#x267B;&#xFE0F;</div>
+                          <h3>Lifecycle Rules</h3>
+                      </div>
+                      <div class="feature">
+                          <div class="icon">&#x1F504;</div>
+                          <h3>Replication</h3>
+                      </div>
+                      <div class="feature">
+                          <div class="icon">&#x1F310;</div>
+                          <h3>Static Website</h3>
+                      </div>
+                  </div>
+                  <div class="footer">
+                      Automated with AWS CloudFormation &mdash; Assignment 7
+                  </div>
+              </div>
+          </body>
+          </html>"""
+
+              # HTML content for error.html
+              error_html = """<!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>404 - Page Not Found</title>
+              <style>
+                  * { margin: 0; padding: 0; box-sizing: border-box; }
+                  body {
+                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                      min-height: 100vh;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                  }
+                  .container {
+                      background: white;
+                      border-radius: 16px;
+                      padding: 48px;
+                      max-width: 500px;
+                      width: 90%;
+                      text-align: center;
+                      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                  }
+                  .code { font-size: 6rem; font-weight: 900; color: #f5576c; line-height: 1; }
+                  h1 { color: #1a1a2e; margin: 16px 0 12px; font-size: 1.5rem; }
+                  p { color: #666; font-size: 0.95rem; line-height: 1.6; }
+                  a {
+                      display: inline-block;
+                      margin-top: 24px;
+                      background: #f5576c;
+                      color: white;
+                      padding: 12px 32px;
+                      border-radius: 50px;
+                      text-decoration: none;
+                      font-weight: 600;
+                      font-size: 0.9rem;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="code">404</div>
+                  <h1>Page Not Found</h1>
+                  <p>The page you are looking for doesn't exist or has been moved.</p>
+                  <a href="index.html">&#8592; Go Back Home</a>
+              </div>
+          </body>
+          </html>"""
+
+              try:
+                  if event['RequestType'] in ['Create', 'Update']:
+                      # Upload index.html
+                      s3.put_object(
+                          Bucket=bucket,
+                          Key='index.html',
+                          Body=index_html.encode('utf-8'),
+                          ContentType='text/html'
+                      )
+                      # Upload error.html
+                      s3.put_object(
+                          Bucket=bucket,
+                          Key='error.html',
+                          Body=error_html.encode('utf-8'),
+                          ContentType='text/html'
+                      )
+                      # Upload a test object to source bucket to validate replication
+                      if test_bucket:
+                          s3.put_object(
+                              Bucket=test_bucket,
+                              Key='replication-test/test-object.txt',
+                              Body=b'This object was uploaded to validate cross-bucket replication. Check the destination bucket!',
+                              ContentType='text/plain'
+                          )
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {
+                          'Message': 'Website files uploaded successfully'
+                      })
+                  elif event['RequestType'] == 'Delete':
+                      # Clean up files on stack deletion
+                      for key in ['index.html', 'error.html']:
+                          try:
+                              s3.delete_object(Bucket=bucket, Key=key)
+                          except:
+                              pass
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              except Exception as e:
+                  cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+
+  # Custom resource that triggers the Lambda to upload files
+  WebsiteFileUploader:
+    Type: AWS::CloudFormation::CustomResource
+    DependsOn:
+      - WebsiteBucketPolicy
+      - SourceBucket
+    Properties:
+      ServiceToken: !GetAtt WebsiteFileUploaderFunction.Arn
+      BucketName: !Ref WebsiteBucket
+      SourceBucketName: !Ref SourceBucket
+      # Changing this forces re-upload when stack updates
+      Version: "1.0"
+
+# ============================================================
+# OUTPUTS
+# ============================================================
+Outputs:
+
+  # --- Source Bucket ---
+  SourceBucketName:
+    Description: Name of the source S3 bucket
+    Value: !Ref SourceBucket
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-SourceBucketName"
+
+  SourceBucketARN:
+    Description: ARN of the source S3 bucket
+    Value: !GetAtt SourceBucket.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-SourceBucketARN"
+
+  # --- Destination Bucket ---
+  DestinationBucketName:
+    Description: Name of the replication destination S3 bucket
+    Value: !Ref DestinationBucket
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-DestinationBucketName"
+
+  DestinationBucketARN:
+    Description: ARN of the replication destination S3 bucket
+    Value: !GetAtt DestinationBucket.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-DestinationBucketARN"
+
+  # --- Website Bucket ---
+  WebsiteBucketName:
+    Description: Name of the static website S3 bucket
+    Value: !Ref WebsiteBucket
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-WebsiteBucketName"
+
+  WebsiteBucketARN:
+    Description: ARN of the static website S3 bucket
+    Value: !GetAtt WebsiteBucket.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-WebsiteBucketARN"
+
+  # --- Website URL (most important output!) ---
+  WebsiteURL:
+    Description: >
+      Public URL of the static website hosted on S3.
+      Open this in your browser to view the website.
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-WebsiteURL"
+
+  # --- IAM Role ---
+  ReplicationRoleARN:
+    Description: ARN of the IAM role used for S3 replication
+    Value: !GetAtt S3ReplicationRole.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-ReplicationRoleARN"
+
+  # --- Summary ---
+  DeploymentSummary:
+    Description: Summary of all deployed resources
+    Value: !Sub |
+      Deployed by CloudFormation Stack in region ${AWS::Region}
+      Source Bucket     : ${SourceBucket}
+      Destination Bucket: ${DestinationBucket}
+      Website Bucket    : ${WebsiteBucket}
+      Website URL       : ${WebsiteBucket.WebsiteURL}
+      Replication Role  : ${S3ReplicationRole.Arn}
