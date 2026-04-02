@@ -1,0 +1,569 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Assignment 7 - Complete Amazon S3 Automation Covers: Bucket Creation, Policies, Lifecycle, Replication, and Static Website Hosting\n",
+    "Parameters": {
+        "ProjectName": {
+            "Type": "String",
+            "Default": "assignment7",
+            "Description": "Project name used as prefix for all resource names"
+        },
+        "Environment": {
+            "Type": "String",
+            "Default": "dev",
+            "AllowedValues": [
+                "dev",
+                "staging",
+                "prod"
+            ],
+            "Description": "Deployment environment"
+        },
+        "ReplicationDestinationRegion": {
+            "Type": "String",
+            "Default": "us-west-2",
+            "Description": "AWS region for the replication destination bucket"
+        }
+    },
+    "Resources": {
+        "S3ReplicationRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-s3-replication-role"
+                },
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "s3.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "S3ReplicationPolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Sid": "AllowSourceBucketRead",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetReplicationConfiguration",
+                                        "s3:ListBucket"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:s3:::${ProjectName}-${Environment}-source-bucket"
+                                    }
+                                },
+                                {
+                                    "Sid": "AllowSourceObjectRead",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetObjectVersionForReplication",
+                                        "s3:GetObjectVersionAcl",
+                                        "s3:GetObjectVersionTagging"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:s3:::${ProjectName}-${Environment}-source-bucket/*"
+                                    }
+                                },
+                                {
+                                    "Sid": "AllowDestinationBucketWrite",
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:ReplicateObject",
+                                        "s3:ReplicateDelete",
+                                        "s3:ReplicateTags",
+                                        "s3:GetObjectVersionTagging"
+                                    ],
+                                    "Resource": {
+                                        "Fn::Sub": "arn:aws:s3:::${ProjectName}-${Environment}-destination-bucket/*"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "SourceBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-source-bucket"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                },
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                },
+                "LifecycleConfiguration": {
+                    "Rules": [
+                        {
+                            "Id": "AutoTierTransitionRule",
+                            "Status": "Enabled",
+                            "Prefix": "",
+                            "Transitions": [
+                                {
+                                    "TransitionInDays": 30,
+                                    "StorageClass": "STANDARD_IA"
+                                },
+                                {
+                                    "TransitionInDays": 60,
+                                    "StorageClass": "INTELLIGENT_TIERING"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "ReplicationConfiguration": {
+                    "Role": {
+                        "Fn::GetAtt": [
+                            "S3ReplicationRole",
+                            "Arn"
+                        ]
+                    },
+                    "Rules": [
+                        {
+                            "Id": "FullBucketReplicationRule",
+                            "Status": "Enabled",
+                            "Priority": 1,
+                            "Filter": {
+                                "Prefix": ""
+                            },
+                            "DeleteMarkerReplication": {
+                                "Status": "Disabled"
+                            },
+                            "Destination": {
+                                "Bucket": {
+                                    "Fn::Sub": "arn:aws:s3:::${ProjectName}-${Environment}-destination-bucket"
+                                },
+                                "StorageClass": "STANDARD"
+                            }
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Project",
+                        "Value": {
+                            "Ref": "ProjectName"
+                        }
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Ref": "Environment"
+                        }
+                    },
+                    {
+                        "Key": "Purpose",
+                        "Value": "source-with-lifecycle-and-replication"
+                    }
+                ]
+            }
+        },
+        "DestinationBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-destination-bucket"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": true,
+                    "BlockPublicPolicy": true,
+                    "IgnorePublicAcls": true,
+                    "RestrictPublicBuckets": true
+                },
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                },
+                "Tags": [
+                    {
+                        "Key": "Project",
+                        "Value": {
+                            "Ref": "ProjectName"
+                        }
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Ref": "Environment"
+                        }
+                    },
+                    {
+                        "Key": "Purpose",
+                        "Value": "replication-destination"
+                    }
+                ]
+            }
+        },
+        "WebsiteBucket": {
+            "Type": "AWS::S3::Bucket",
+            "Properties": {
+                "BucketName": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-website-bucket"
+                },
+                "PublicAccessBlockConfiguration": {
+                    "BlockPublicAcls": false,
+                    "BlockPublicPolicy": false,
+                    "IgnorePublicAcls": false,
+                    "RestrictPublicBuckets": false
+                },
+                "VersioningConfiguration": {
+                    "Status": "Enabled"
+                },
+                "WebsiteConfiguration": {
+                    "IndexDocument": "index.html",
+                    "ErrorDocument": "error.html"
+                },
+                "LifecycleConfiguration": {
+                    "Rules": [
+                        {
+                            "Id": "WebsiteAssetLifecycle",
+                            "Status": "Enabled",
+                            "Prefix": "",
+                            "Transitions": [
+                                {
+                                    "TransitionInDays": 30,
+                                    "StorageClass": "STANDARD_IA"
+                                },
+                                {
+                                    "TransitionInDays": 60,
+                                    "StorageClass": "INTELLIGENT_TIERING"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Project",
+                        "Value": {
+                            "Ref": "ProjectName"
+                        }
+                    },
+                    {
+                        "Key": "Environment",
+                        "Value": {
+                            "Ref": "Environment"
+                        }
+                    },
+                    {
+                        "Key": "Purpose",
+                        "Value": "static-website-hosting"
+                    }
+                ]
+            }
+        },
+        "SourceBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "SourceBucket"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AllowReplicationRoleAccess",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::GetAtt": [
+                                        "S3ReplicationRole",
+                                        "Arn"
+                                    ]
+                                }
+                            },
+                            "Action": [
+                                "s3:GetObjectVersionForReplication",
+                                "s3:GetObjectVersionAcl",
+                                "s3:GetObjectVersionTagging",
+                                "s3:GetReplicationConfiguration",
+                                "s3:ListBucket"
+                            ],
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "SourceBucket",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Sub": "${SourceBucket.Arn}/*"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        "DestinationBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "DestinationBucket"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AllowReplicationWrite",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": {
+                                    "Fn::GetAtt": [
+                                        "S3ReplicationRole",
+                                        "Arn"
+                                    ]
+                                }
+                            },
+                            "Action": [
+                                "s3:ReplicateObject",
+                                "s3:ReplicateDelete",
+                                "s3:ReplicateTags",
+                                "s3:GetObjectVersionTagging"
+                            ],
+                            "Resource": {
+                                "Fn::Sub": "${DestinationBucket.Arn}/*"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "WebsiteBucketPolicy": {
+            "Type": "AWS::S3::BucketPolicy",
+            "DependsOn": "WebsiteBucket",
+            "Properties": {
+                "Bucket": {
+                    "Ref": "WebsiteBucket"
+                },
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "PublicReadGetObject",
+                            "Effect": "Allow",
+                            "Principal": "*",
+                            "Action": "s3:GetObject",
+                            "Resource": {
+                                "Fn::Sub": "${WebsiteBucket.Arn}/*"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "LambdaExecutionRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "RoleName": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-lambda-exec-role"
+                },
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                            },
+                            "Action": "sts:AssumeRole"
+                        }
+                    ]
+                },
+                "ManagedPolicyArns": [
+                    "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                ],
+                "Policies": [
+                    {
+                        "PolicyName": "S3WritePolicy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:PutObject",
+                                        "s3:DeleteObject"
+                                    ],
+                                    "Resource": [
+                                        {
+                                            "Fn::Sub": "${WebsiteBucket.Arn}/*"
+                                        },
+                                        {
+                                            "Fn::Sub": "${SourceBucket.Arn}/*"
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "WebsiteFileUploaderFunction": {
+            "Type": "AWS::Lambda::Function",
+            "Properties": {
+                "FunctionName": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-website-uploader"
+                },
+                "Runtime": "python3.12",
+                "Handler": "index.handler",
+                "Role": {
+                    "Fn::GetAtt": [
+                        "LambdaExecutionRole",
+                        "Arn"
+                    ]
+                },
+                "Timeout": 30,
+                "Code": {
+                    "ZipFile": "import boto3\nimport cfnresponse\nimport json\n\ndef handler(event, context):\n    s3 = boto3.client('s3')\n    bucket = event['ResourceProperties']['BucketName']\n    test_bucket = event['ResourceProperties'].get('SourceBucketName', '')\n\n    # HTML content for index.html\n    index_html = \"\"\"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>Assignment 7 - S3 Static Website</title>\n    <style>\n        * { margin: 0; padding: 0; box-sizing: border-box; }\n        body {\n            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);\n            min-height: 100vh;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n        }\n        .container {\n            background: white;\n            border-radius: 16px;\n            padding: 48px;\n            max-width: 700px;\n            width: 90%;\n            text-align: center;\n            box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n        }\n        .badge {\n            background: #667eea;\n            color: white;\n            padding: 6px 20px;\n            border-radius: 50px;\n            font-size: 13px;\n            font-weight: 600;\n            display: inline-block;\n            margin-bottom: 24px;\n            letter-spacing: 1px;\n            text-transform: uppercase;\n        }\n        h1 { color: #1a1a2e; font-size: 2rem; margin-bottom: 12px; }\n        p { color: #666; font-size: 1rem; line-height: 1.7; margin-bottom: 32px; }\n        .features {\n            display: grid;\n            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));\n            gap: 16px;\n            margin-top: 24px;\n        }\n        .feature {\n            background: #f8f9ff;\n            border: 1px solid #e8eaff;\n            border-radius: 12px;\n            padding: 20px 12px;\n        }\n        .feature .icon { font-size: 2rem; margin-bottom: 8px; }\n        .feature h3 { font-size: 0.85rem; color: #333; font-weight: 600; }\n        .footer {\n            margin-top: 36px;\n            font-size: 0.8rem;\n            color: #aaa;\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"badge\">&#x2705; Hosted on Amazon S3</div>\n        <h1>Assignment 7</h1>\n        <p>\n            This static website is fully automated using <strong>AWS CloudFormation</strong>.\n            The S3 bucket, policies, lifecycle rules, and replication were all\n            provisioned without any manual steps.\n        </p>\n        <div class=\"features\">\n            <div class=\"feature\">\n                <div class=\"icon\">&#x1F4E6;</div>\n                <h3>S3 Buckets</h3>\n            </div>\n            <div class=\"feature\">\n                <div class=\"icon\">&#x1F512;</div>\n                <h3>Bucket Policies</h3>\n            </div>\n            <div class=\"feature\">\n                <div class=\"icon\">&#x267B;&#xFE0F;</div>\n                <h3>Lifecycle Rules</h3>\n            </div>\n            <div class=\"feature\">\n                <div class=\"icon\">&#x1F504;</div>\n                <h3>Replication</h3>\n            </div>\n            <div class=\"feature\">\n                <div class=\"icon\">&#x1F310;</div>\n                <h3>Static Website</h3>\n            </div>\n        </div>\n        <div class=\"footer\">\n            Automated with AWS CloudFormation &mdash; Assignment 7\n        </div>\n    </div>\n</body>\n</html>\"\"\"\n\n    # HTML content for error.html\n    error_html = \"\"\"<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>404 - Page Not Found</title>\n    <style>\n        * { margin: 0; padding: 0; box-sizing: border-box; }\n        body {\n            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;\n            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);\n            min-height: 100vh;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n        }\n        .container {\n            background: white;\n            border-radius: 16px;\n            padding: 48px;\n            max-width: 500px;\n            width: 90%;\n            text-align: center;\n            box-shadow: 0 20px 60px rgba(0,0,0,0.3);\n        }\n        .code { font-size: 6rem; font-weight: 900; color: #f5576c; line-height: 1; }\n        h1 { color: #1a1a2e; margin: 16px 0 12px; font-size: 1.5rem; }\n        p { color: #666; font-size: 0.95rem; line-height: 1.6; }\n        a {\n            display: inline-block;\n            margin-top: 24px;\n            background: #f5576c;\n            color: white;\n            padding: 12px 32px;\n            border-radius: 50px;\n            text-decoration: none;\n            font-weight: 600;\n            font-size: 0.9rem;\n        }\n    </style>\n</head>\n<body>\n    <div class=\"container\">\n        <div class=\"code\">404</div>\n        <h1>Page Not Found</h1>\n        <p>The page you are looking for doesn't exist or has been moved.</p>\n        <a href=\"index.html\">&#8592; Go Back Home</a>\n    </div>\n</body>\n</html>\"\"\"\n\n    try:\n        if event['RequestType'] in ['Create', 'Update']:\n            # Upload index.html\n            s3.put_object(\n                Bucket=bucket,\n                Key='index.html',\n                Body=index_html.encode('utf-8'),\n                ContentType='text/html'\n            )\n            # Upload error.html\n            s3.put_object(\n                Bucket=bucket,\n                Key='error.html',\n                Body=error_html.encode('utf-8'),\n                ContentType='text/html'\n            )\n            # Upload a test object to source bucket to validate replication\n            if test_bucket:\n                s3.put_object(\n                    Bucket=test_bucket,\n                    Key='replication-test/test-object.txt',\n                    Body=b'This object was uploaded to validate cross-bucket replication. Check the destination bucket!',\n                    ContentType='text/plain'\n                )\n            cfnresponse.send(event, context, cfnresponse.SUCCESS, {\n                'Message': 'Website files uploaded successfully'\n            })\n        elif event['RequestType'] == 'Delete':\n            # Clean up files on stack deletion\n            for key in ['index.html', 'error.html']:\n                try:\n                    s3.delete_object(Bucket=bucket, Key=key)\n                except:\n                    pass\n            cfnresponse.send(event, context, cfnresponse.SUCCESS, {})\n    except Exception as e:\n        cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})\n"
+                }
+            }
+        },
+        "WebsiteFileUploader": {
+            "Type": "AWS::CloudFormation::CustomResource",
+            "DependsOn": [
+                "WebsiteBucketPolicy",
+                "SourceBucket"
+            ],
+            "Properties": {
+                "ServiceToken": {
+                    "Fn::GetAtt": [
+                        "WebsiteFileUploaderFunction",
+                        "Arn"
+                    ]
+                },
+                "BucketName": {
+                    "Ref": "WebsiteBucket"
+                },
+                "SourceBucketName": {
+                    "Ref": "SourceBucket"
+                },
+                "Version": "1.0"
+            }
+        }
+    },
+    "Outputs": {
+        "SourceBucketName": {
+            "Description": "Name of the source S3 bucket",
+            "Value": {
+                "Ref": "SourceBucket"
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-SourceBucketName"
+                }
+            }
+        },
+        "SourceBucketARN": {
+            "Description": "ARN of the source S3 bucket",
+            "Value": {
+                "Fn::GetAtt": [
+                    "SourceBucket",
+                    "Arn"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-SourceBucketARN"
+                }
+            }
+        },
+        "DestinationBucketName": {
+            "Description": "Name of the replication destination S3 bucket",
+            "Value": {
+                "Ref": "DestinationBucket"
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-DestinationBucketName"
+                }
+            }
+        },
+        "DestinationBucketARN": {
+            "Description": "ARN of the replication destination S3 bucket",
+            "Value": {
+                "Fn::GetAtt": [
+                    "DestinationBucket",
+                    "Arn"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-DestinationBucketARN"
+                }
+            }
+        },
+        "WebsiteBucketName": {
+            "Description": "Name of the static website S3 bucket",
+            "Value": {
+                "Ref": "WebsiteBucket"
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-WebsiteBucketName"
+                }
+            }
+        },
+        "WebsiteBucketARN": {
+            "Description": "ARN of the static website S3 bucket",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebsiteBucket",
+                    "Arn"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-WebsiteBucketARN"
+                }
+            }
+        },
+        "WebsiteURL": {
+            "Description": "Public URL of the static website hosted on S3. Open this in your browser to view the website.\n",
+            "Value": {
+                "Fn::GetAtt": [
+                    "WebsiteBucket",
+                    "WebsiteURL"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-WebsiteURL"
+                }
+            }
+        },
+        "ReplicationRoleARN": {
+            "Description": "ARN of the IAM role used for S3 replication",
+            "Value": {
+                "Fn::GetAtt": [
+                    "S3ReplicationRole",
+                    "Arn"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${ProjectName}-${Environment}-ReplicationRoleARN"
+                }
+            }
+        },
+        "DeploymentSummary": {
+            "Description": "Summary of all deployed resources",
+            "Value": {
+                "Fn::Sub": "Deployed by CloudFormation Stack in region ${AWS::Region}\nSource Bucket     : ${SourceBucket}\nDestination Bucket: ${DestinationBucket}\nWebsite Bucket    : ${WebsiteBucket}\nWebsite URL       : ${WebsiteBucket.WebsiteURL}\nReplication Role  : ${S3ReplicationRole.Arn}\n"
+            }
+        }
+    }
+}
